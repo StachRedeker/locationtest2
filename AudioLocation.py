@@ -1,10 +1,10 @@
 ﻿import streamlit as st
+from streamlit_js_eval import get_geolocation
+import folium
 import datetime
 import pandas as pd
 import base64
-import folium
 import streamlit.components.v1 as components
-from streamlit_js_eval import get_geolocation
 
 import auth
 import points
@@ -18,13 +18,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# (Optional: If you want to remove Streamlit branding via CSS, you can add:)
+# Hide default Streamlit branding
 hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            </style>
-            """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {display: none;}
+    </style>
+    """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Piraten-thema titel en introductie
@@ -40,7 +40,7 @@ if authenticated:
     # Checkbox voor het tonen van cirkels
     show_radii = st.checkbox("Toon cirkels", value=True, 
                              help="Laat de cirkels zien rond iedere locatie, alsof het vijandelijk water is.")
-    # Checkbox om inactieve locaties te verbergen, toegepast op zowel de kaart als de tabel.
+    # Checkbox om inactieve locaties te verbergen (voor zowel kaart als tabel)
     hide_inactive = st.checkbox("Verberg inactieve locaties", value=False, 
                                 help="Verberg locaties die niet actief zijn (buiten de datumperiode).")
     
@@ -57,19 +57,19 @@ if authenticated:
             if hide_inactive:
                 df_points = df_points[df_points.apply(lambda row: row["available_from"] <= current_date <= row["available_to"], axis=1)]
             
-            # Maak de kaart met de (optioneel gefilterde) punten
+            # Maak de kaart met gefilterde punten
             folium_map = plot_location(lat, lon, show_radii, points_df=df_points)
             map_html = folium_map.get_root().render()
             map_html = map_html.replace('width:700px', 'width:100%')
             components.html(map_html, height=500)
             
-            # Invoeroptie voor het aantal locaties om te tonen
+            # Invoeropties voor aantal locaties
             num_locations = st.number_input("Aantal locaties om te tonen", 
                                             min_value=1, value=10, step=1,
                                             help="Voer het aantal dichtstbijzijnde locaties in dat je wilt zien. 10 is de standaard.")
             
             if st.button("Toon dichtstbijzijnde locaties, maat!"):
-                # Bereken afstand voor elke locatie
+                # Bereken de afstand voor elke locatie
                 df_points["distance"] = df_points.apply(lambda row: points.haversine(lat, lon, row["latitude"], row["longitude"]), axis=1)
                 closest_df = df_points.nsmallest(num_locations, "distance").copy()
                 
@@ -90,7 +90,6 @@ if authenticated:
                             try:
                                 file_data, file_name = voice_memo.get_decrypted_voice_memo(row["voice_memo"])
                                 b64 = base64.b64encode(file_data).decode()
-                                # Gebruik MIME type 'application/octet-stream' zodat er geen .mp3 wordt toegevoegd.
                                 download_link = f'<a href="data:application/octet-stream;base64,{b64}" download="{file_name}">Schat opgraven</a>'
                                 voice_memo_status.append(download_link)
                             except Exception as e:
@@ -103,6 +102,6 @@ if authenticated:
                 display_df = closest_df.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
                 final_cols = ["Locatie", "Straal (km)", "Actieve Periode", "Afstand (km)", "Schat"]
                 html_table = display_df[final_cols].to_html(escape=False, index=False)
-                # Voeg custom CSS toe om de tabelkoppen links uit te lijnen
+                # Voeg custom CSS toe voor links uitgelijnde headers
                 html_table = '<style>th { text-align: left !important; }</style>' + html_table
                 st.markdown(f'<div style="overflow-x:auto;">{html_table}</div>', unsafe_allow_html=True)
