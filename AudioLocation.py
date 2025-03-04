@@ -11,67 +11,71 @@ import points
 from map_plot import plot_location
 import voice_memo
 
-# Liefdesboodschap voor Kim
+# Pirate-themed title and introduction
+st.title("Piraten Locatiekaart")
 st.markdown("""
-# Gebruikerslocatie op de kaart
-Welkom lieve XXX! ❤️  
+Ahoy, piraat! Zet koers naar jouw verborgen schat.  
+Gebruik deze kaart om je huidige locatie te bepalen en de dichtstbijzijnde geheimen (locaties) te ontdekken.
 """)
 
 username, authenticated = auth.authenticate()
 if authenticated:
-    # Opties voor de gebruiker
-    toon_stralen = st.checkbox("Toon stralen", value=True)
+    # Checkbox to show the radii
+    show_radii = st.checkbox("Toon straalgebieden", value=True, help="Laat de cirkels zien rond iedere locatie.")
+    
     loc = None
-    if st.checkbox("Controleer mijn locatie"):
+    if st.checkbox("Bepaal mijne locatie", help="Klik hier om jouw huidige positie te bepalen via je browser. Arr!"):
         loc = get_geolocation()
-        st.write("Je coördinaten:", loc)
+        st.write("Arr! Hier zijn je coördinaten:", loc)
         if loc and "coords" in loc:
             lat = loc["coords"]["latitude"]
             lon = loc["coords"]["longitude"]
-            kaart = plot_location(lat, lon, toon_stralen)
-            folium_static(kaart, width=700, height=500)
+            folium_map = plot_location(lat, lon, show_radii)
+            folium_static(folium_map, width=700, height=500)
             
-            # Gebruiker kan het aantal te tonen locaties aanpassen; standaard is 10.
-            aantal_locaties = st.number_input("Aantal locaties om te tonen", min_value=1, value=10, step=1)
-            verberg_inactief = st.checkbox("Verberg inactieve locaties", value=False)
+            # User input for number of locations to show and whether to hide inactive locations
+            num_locations = st.number_input("Aantal locaties om te tonen", min_value=1, value=10, step=1, help="Voer het aantal dichtstbijzijnde locaties in dat je wilt zien. 10 is de standaard.")
+            hide_inactive = st.checkbox("Verberg inactieve locaties", value=False, help="Als geselecteerd, worden locaties die niet actief zijn (buiten de datumperiode) niet getoond.")
             
-            if st.button("Toon dichtstbijzijnde locaties"):
+            if st.button("Toon dichtstbijzijnde locaties, maat!"):
                 df_points = points.load_points()
-                # Bereken de afstand voor elke locatie
-                df_points["afstand"] = df_points.apply(lambda row: points.haversine(lat, lon, row["latitude"], row["longitude"]), axis=1)
-                huidige_datum = datetime.datetime.utcnow()
-                # Filter inactieve locaties als dit gevraagd is
-                if verberg_inactief:
-                    df_points = df_points[df_points.apply(lambda row: row["available_from"] <= huidige_datum <= row["available_to"], axis=1)]
-                # Selecteer de dichtstbijzijnde locaties
-                dichtstbijzijnde = df_points.nsmallest(aantal_locaties, "afstand").copy()
+                # Bereken de afstand voor elke locatie.
+                df_points["distance"] = df_points.apply(lambda row: points.haversine(lat, lon, row["latitude"], row["longitude"]), axis=1)
+                current_date = datetime.datetime.utcnow()
+                # Filter inactieve locaties indien gewenst.
+                if hide_inactive:
+                    df_points = df_points[df_points.apply(lambda row: row["available_from"] <= current_date <= row["available_to"], axis=1)]
+                # Selecteer de dichtstbijzijnde 'num_locations' locaties.
+                closest_df = df_points.nsmallest(num_locations, "distance").copy()
                 
-                # Bouw de kolom voor spraakmemo-status
-                spraakmemo_status = []
-                for idx, row in dichtstbijzijnde.iterrows():
+                # Bouw de 'Stemmemo' kolom
+                voice_memo_status = []
+                for idx, row in closest_df.iterrows():
                     if "voice_memo" not in row or pd.isna(row["voice_memo"]) or row["voice_memo"].strip() == "":
-                        spraakmemo_status.append("Geen spraakmemo")
+                        voice_memo_status.append("Geen stemmemo")
                     else:
-                        if not (row["available_from"] <= huidige_datum <= row["available_to"]):
-                            spraakmemo_status.append(
+                        if not (row["available_from"] <= current_date <= row["available_to"]):
+                            voice_memo_status.append(
                                 f"Niet actief (beschikbaar van {row['available_from'].date()} tot {row['available_to'].date()})"
                             )
-                        elif row["afstand"] > row["radius"]:
-                            spraakmemo_status.append(
-                                f"Buiten bereik (afstand: {row['afstand']:.2f} km, straal: {row['radius']:.2f} km)"
+                        elif row["distance"] > row["radius"]:
+                            voice_memo_status.append(
+                                f"Buiten bereik (afstand: {row['distance']:.2f} km, straal: {row['radius']:.2f} km)"
                             )
                         else:
                             try:
                                 file_data, file_name = voice_memo.get_decrypted_voice_memo(row["voice_memo"])
                                 b64 = base64.b64encode(file_data).decode()
-                                download_link = f'<a href="data:audio/mpeg;base64,{b64}" download="{file_name}">Download spraakmemo</a>'
-                                spraakmemo_status.append(download_link)
+                                download_link = f'<a href="data:audio/mpeg;base64,{b64}" download="{file_name}">Download stemmemo</a>'
+                                voice_memo_status.append(download_link)
                             except Exception as e:
-                                spraakmemo_status.append(f"Fout bij decoderen: {str(e)}")
-                dichtstbijzijnde["Spraakmemo"] = spraakmemo_status
-                dichtstbijzijnde["Afstand (km)"] = dichtstbijzijnde["afstand"].map(lambda d: f"{d:.2f}")
-                dichtstbijzijnde["Actieve periode"] = dichtstbijzijnde.apply(lambda row: f"{row['available_from'].date()} tot {row['available_to'].date()}", axis=1)
-                display_df = dichtstbijzijnde.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
-                kolommen = ["Locatie", "Straal (km)", "Actieve periode", "Afstand (km)", "Spraakmemo"]
-                html_table = display_df[kolommen].to_html(escape=False, index=False)
+                                voice_memo_status.append(f"Fout bij decryptie: {str(e)}")
+                closest_df["Stemmemo"] = voice_memo_status
+                closest_df["Afstand (km)"] = closest_df["distance"].map(lambda d: f"{d:.2f}")
+                closest_df["Actieve Periode"] = closest_df.apply(
+                    lambda row: f"{row['available_from'].date()} tot {row['available_to'].date()}", axis=1
+                )
+                display_df = closest_df.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
+                final_cols = ["Locatie", "Straal (km)", "Actieve Periode", "Afstand (km)", "Stemmemo"]
+                html_table = display_df[final_cols].to_html(escape=False, index=False)
                 st.markdown(html_table, unsafe_allow_html=True)
