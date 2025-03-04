@@ -3,14 +3,16 @@ import datetime
 import points
 from points import haversine
 
-def plot_location(user_lat, user_lon, show_radii):
+def plot_location(user_lat, user_lon, show_radii, points_df=None):
     """
     Creates a folium map centered on the user's position and adds markers and circles for each location.
     
     The color of the circle indicates:
-      - Gray: the location is inactive (datum buiten bereik)
+      - Gray: the location is inactive (beschikbaar buiten de datumperiode)
       - Green: the location is active and the user is within the radius (binnen bereik)
       - Red: the location is active but the user is outside the radius (buiten bereik)
+    
+    If points_df is provided, it is used instead of loading points from storage.
     """
     m = folium.Map(location=[user_lat, user_lon], zoom_start=12, control_scale=True)
     folium.Marker(
@@ -20,7 +22,11 @@ def plot_location(user_lat, user_lon, show_radii):
         icon=folium.Icon(color='blue')
     ).add_to(m)
     
-    df = points.load_points()
+    if points_df is None:
+        df = points.load_points()
+    else:
+        df = points_df
+
     if not df.empty:
         current_date = datetime.datetime.utcnow()
         for _, row in df.iterrows():
@@ -42,7 +48,7 @@ def plot_location(user_lat, user_lon, show_radii):
                 else:
                     circle_color = "red"
             
-            if show_radii:
+            if show_radii and is_active:
                 folium.Circle(
                     location=[loc_lat, loc_lon],
                     radius=loc_radius * 1000,  # convert km to m
