@@ -11,21 +11,25 @@ import points
 from map_plot import plot_location
 import voice_memo
 
-# Set page config: custom title, favicon, and layout.
+# Set page configuration with custom favicon.
 st.set_page_config(
     page_title="Piraten Locatiekaart",
     page_icon="favicon.png",
     layout="wide"
 )
 
-# Hide default Streamlit branding
-hide_streamlit_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {display: none;}
-    </style>
+# Custom CSS to force a max-width on the container so that on desktop the content stays within bounds.
+st.markdown(
     """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+    <style>
+    .main .block-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Piraten-thema titel en introductie
 st.title("Piraten Locatiekaart 🏴‍☠️")
@@ -51,25 +55,26 @@ if authenticated:
         if loc and "coords" in loc:
             lat = loc["coords"]["latitude"]
             lon = loc["coords"]["longitude"]
-            # Laad punten en filter indien hide_inactive is geselecteerd
+            # Laad de punten en filter indien hide_inactive is geselecteerd
             df_points = points.load_points()
             current_date = datetime.datetime.utcnow()
             if hide_inactive:
                 df_points = df_points[df_points.apply(lambda row: row["available_from"] <= current_date <= row["available_to"], axis=1)]
             
-            # Maak de kaart met gefilterde punten
+            # Maak de kaart met de (optioneel gefilterde) punten
             folium_map = plot_location(lat, lon, show_radii, points_df=df_points)
             map_html = folium_map.get_root().render()
+            # Replace fixed width with 100% so that the map is responsive.
             map_html = map_html.replace('width:700px', 'width:100%')
             components.html(map_html, height=500)
             
-            # Invoeropties voor aantal locaties
+            # Invoeroptie voor het aantal locaties om te tonen
             num_locations = st.number_input("Aantal locaties om te tonen", 
                                             min_value=1, value=10, step=1,
                                             help="Voer het aantal dichtstbijzijnde locaties in dat je wilt zien. 10 is de standaard.")
             
             if st.button("Toon dichtstbijzijnde locaties, maat!"):
-                # Bereken de afstand voor elke locatie
+                # Bereken afstand voor iedere locatie
                 df_points["distance"] = df_points.apply(lambda row: points.haversine(lat, lon, row["latitude"], row["longitude"]), axis=1)
                 closest_df = df_points.nsmallest(num_locations, "distance").copy()
                 
@@ -90,6 +95,7 @@ if authenticated:
                             try:
                                 file_data, file_name = voice_memo.get_decrypted_voice_memo(row["voice_memo"])
                                 b64 = base64.b64encode(file_data).decode()
+                                # Use MIME type application/octet-stream so the browser doesn't append .mp3
                                 download_link = f'<a href="data:application/octet-stream;base64,{b64}" download="{file_name}">Schat opgraven</a>'
                                 voice_memo_status.append(download_link)
                             except Exception as e:
@@ -102,6 +108,6 @@ if authenticated:
                 display_df = closest_df.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
                 final_cols = ["Locatie", "Straal (km)", "Actieve Periode", "Afstand (km)", "Schat"]
                 html_table = display_df[final_cols].to_html(escape=False, index=False)
-                # Voeg custom CSS toe voor links uitgelijnde headers
+                # Voeg custom CSS toe voor links uitgelijnde koppen
                 html_table = '<style>th { text-align: left !important; }</style>' + html_table
                 st.markdown(f'<div style="overflow-x:auto;">{html_table}</div>', unsafe_allow_html=True)
