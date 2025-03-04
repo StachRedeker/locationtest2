@@ -7,7 +7,7 @@ def plot_location(user_lat, user_lon, show_radii, points_df=None):
     """
     Creates a folium map centered on the user's position and adds markers and circles for each location.
     
-    The color of the circle indicates:
+    The circle's color indicates:
       - Gray: the location is inactive (beschikbaar buiten de datumperiode)
       - Green: the location is active and the user is within the radius (binnen bereik)
       - Red: the location is active but the user is outside the radius (buiten bereik)
@@ -48,7 +48,7 @@ def plot_location(user_lat, user_lon, show_radii, points_df=None):
                 else:
                     circle_color = "red"
             
-            if show_radii and is_active:
+            if show_radii:
                 folium.Circle(
                     location=[loc_lat, loc_lon],
                     radius=loc_radius * 1000,  # convert km to m
