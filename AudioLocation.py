@@ -1,10 +1,10 @@
 ﻿import streamlit as st
 from streamlit_js_eval import get_geolocation
-from streamlit_folium import folium_static
 import folium
 import datetime
 import pandas as pd
 import base64
+import streamlit.components.v1 as components
 
 import auth
 import points
@@ -21,7 +21,7 @@ Bereid je voor op een avontuur vol verborgen rijkdommen en gevaarlijke wateren!
 
 username, authenticated = auth.authenticate()
 if authenticated:
-    # Checkbox to show radii (straalgebieden)
+    # Option to show radii (straalgebieden)
     show_radii = st.checkbox("Toon straalgebieden", value=True, 
                              help="Laat de cirkels zien rond iedere locatie, alsof het de grenzen van vijandelijk gebied zijn.")
     
@@ -33,23 +33,27 @@ if authenticated:
         if loc and "coords" in loc:
             lat = loc["coords"]["latitude"]
             lon = loc["coords"]["longitude"]
-            # Remove use_container_width parameter since it's not supported.
+            # Generate the folium map using the main app plotting function
             folium_map = plot_location(lat, lon, show_radii)
-            folium_static(folium_map, height=500)
+            # Render the map to HTML
+            map_html = folium_map.get_root().render()
+            # Replace fixed width with 100% for responsiveness
+            map_html = map_html.replace('width:700px', 'width:100%')
+            components.html(map_html, height=500)
             
-            # User inputs for number of locations to show and whether to hide inactive ones
+            # User input for number of locations to show and hiding inactive locations
             num_locations = st.number_input("Aantal locaties om te tonen", 
                                             min_value=1, value=10, step=1,
                                             help="Voer het aantal dichtstbijzijnde locaties in dat je wilt zien. 10 is de standaard.")
             hide_inactive = st.checkbox("Verberg inactieve locaties", value=False, 
-                                        help="Verberg locaties die nog niet actief zijn (buiten de datumperiode).")
+                                        help="Verberg locaties die niet actief zijn (buiten de datumperiode).")
             
             if st.button("Toon dichtstbijzijnde locaties, maat!"):
                 df_points = points.load_points()
-                # Bereken de afstand voor iedere locatie
+                # Bereken de afstand voor elke locatie
                 df_points["distance"] = df_points.apply(lambda row: points.haversine(lat, lon, row["latitude"], row["longitude"]), axis=1)
                 current_date = datetime.datetime.utcnow()
-                # Filter inactieve locaties indien nodig
+                # Filter out inactieve locaties if checkbox is selected
                 if hide_inactive:
                     df_points = df_points[df_points.apply(lambda row: row["available_from"] <= current_date <= row["available_to"], axis=1)]
                 # Selecteer de dichtstbijzijnde 'num_locations' locaties
@@ -85,5 +89,5 @@ if authenticated:
                 display_df = closest_df.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
                 final_cols = ["Locatie", "Straal (km)", "Actieve Periode", "Afstand (km)", "Stemmemo"]
                 html_table = display_df[final_cols].to_html(escape=False, index=False)
-                # Wrap the table in a responsive div for horizontal scrolling
+                # Wrap table in a scrollable div for responsiveness
                 st.markdown(f'<div style="overflow-x:auto;">{html_table}</div>', unsafe_allow_html=True)
