@@ -15,37 +15,44 @@ import voice_memo
 st.title("Piraten Locatiekaart")
 st.markdown("""
 Ahoy, piraat! Zet koers naar jouw verborgen schat.  
-Gebruik deze kaart om je huidige locatie te bepalen en de dichtstbijzijnde geheimen (locaties) te ontdekken.
+Gebruik deze kaart om je huidige locatie te bepalen en de dichtstbijzijnde geheimen (locaties) te ontdekken.  
+Bereid je voor op een avontuur vol verborgen rijkdommen en gevaarlijke wateren!
 """)
 
 username, authenticated = auth.authenticate()
 if authenticated:
-    # Checkbox to show the radii
-    show_radii = st.checkbox("Toon straalgebieden", value=True, help="Laat de cirkels zien rond iedere locatie.")
+    # Checkbox to show radii (straalgebieden)
+    show_radii = st.checkbox("Toon straalgebieden", value=True, 
+                             help="Laat de cirkels zien rond iedere locatie, alsof het de grenzen van vijandelijk gebied zijn.")
     
     loc = None
-    if st.checkbox("Bepaal mijne locatie", help="Klik hier om jouw huidige positie te bepalen via je browser. Arr!"):
+    if st.checkbox("Bepaal mijne locatie", 
+                   help="Klik hier om jouw huidige positie te bepalen via je browser. Arr!"):
         loc = get_geolocation()
         st.write("Arr! Hier zijn je coördinaten:", loc)
         if loc and "coords" in loc:
             lat = loc["coords"]["latitude"]
             lon = loc["coords"]["longitude"]
+            # Use container width for better responsiveness
             folium_map = plot_location(lat, lon, show_radii)
-            folium_static(folium_map, width=700, height=500)
+            folium_static(folium_map, height=500, use_container_width=True)
             
-            # User input for number of locations to show and whether to hide inactive locations
-            num_locations = st.number_input("Aantal locaties om te tonen", min_value=1, value=10, step=1, help="Voer het aantal dichtstbijzijnde locaties in dat je wilt zien. 10 is de standaard.")
-            hide_inactive = st.checkbox("Verberg inactieve locaties", value=False, help="Als geselecteerd, worden locaties die niet actief zijn (buiten de datumperiode) niet getoond.")
+            # User inputs for number of locations to show and whether to hide inactive ones
+            num_locations = st.number_input("Aantal locaties om te tonen", 
+                                            min_value=1, value=10, step=1,
+                                            help="Voer het aantal dichtstbijzijnde locaties in dat je wilt zien. 10 is de standaard.")
+            hide_inactive = st.checkbox("Verberg inactieve locaties", value=False, 
+                                        help="Verberg locaties die nog niet actief zijn (buiten de datumperiode).")
             
             if st.button("Toon dichtstbijzijnde locaties, maat!"):
                 df_points = points.load_points()
-                # Bereken de afstand voor elke locatie.
+                # Bereken de afstand voor iedere locatie
                 df_points["distance"] = df_points.apply(lambda row: points.haversine(lat, lon, row["latitude"], row["longitude"]), axis=1)
                 current_date = datetime.datetime.utcnow()
-                # Filter inactieve locaties indien gewenst.
+                # Filter inactieve locaties indien nodig
                 if hide_inactive:
                     df_points = df_points[df_points.apply(lambda row: row["available_from"] <= current_date <= row["available_to"], axis=1)]
-                # Selecteer de dichtstbijzijnde 'num_locations' locaties.
+                # Selecteer de dichtstbijzijnde 'num_locations' locaties
                 closest_df = df_points.nsmallest(num_locations, "distance").copy()
                 
                 # Bouw de 'Stemmemo' kolom
@@ -78,4 +85,5 @@ if authenticated:
                 display_df = closest_df.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
                 final_cols = ["Locatie", "Straal (km)", "Actieve Periode", "Afstand (km)", "Stemmemo"]
                 html_table = display_df[final_cols].to_html(escape=False, index=False)
-                st.markdown(html_table, unsafe_allow_html=True)
+                # Wrap the table in a responsive div
+                st.markdown(f'<div style="overflow-x:auto;">{html_table}</div>', unsafe_allow_html=True)
