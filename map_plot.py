@@ -3,30 +3,27 @@ import datetime
 import points
 from points import haversine
 
-def plot_location(user_lat, user_lon, show_radii, points_df=None):
+def plot_location(user_lat, user_lon, show_radii):
     """
     Creates a folium map centered on the user's position and adds markers and circles for each location.
     
-    The color of the circle indicates:
-      - Gray: the location is inactive (beschikbaar buiten de datumperiode)
-      - Green: the location is active and the user is within the radius (binnen bereik)
-      - Red: the location is active but the user is outside the radius (buiten bereik)
+    The circle color indicates:
+      - Gray: location is inactive (beschikbaar buiten de datumperiode)
+      - Green: location is active and the user is within the radius (binnen bereik)
+      - Red: location is active but the user is outside the radius (buiten bereik)
     
-    If points_df is provided, it is used instead of loading points from storage.
+    User-visible texts are in Dutch with a pirate flavor.
     """
     m = folium.Map(location=[user_lat, user_lon], zoom_start=12, control_scale=True)
+    # User's location marker with a blue icon.
     folium.Marker(
         [user_lat, user_lon],
         popup="Jouw positie",
         tooltip="Hier ben jij, piraat! 🏴‍☠️",
-        icon=folium.Icon(color='blue')
+        icon=folium.Icon(color='blue', icon='user', prefix='fa')
     ).add_to(m)
     
-    if points_df is None:
-        df = points.load_points()
-    else:
-        df = points_df
-
+    df = points.load_points()
     if not df.empty:
         current_date = datetime.datetime.utcnow()
         for _, row in df.iterrows():
@@ -43,10 +40,7 @@ def plot_location(user_lat, user_lon, show_radii, points_df=None):
             if not is_active:
                 circle_color = "gray"
             else:
-                if distance <= loc_radius:
-                    circle_color = "green"
-                else:
-                    circle_color = "red"
+                circle_color = "green" if distance <= loc_radius else "red"
             
             if show_radii and is_active:
                 folium.Circle(
@@ -67,6 +61,6 @@ def plot_location(user_lat, user_lon, show_radii, points_df=None):
                 [loc_lat, loc_lon],
                 popup=popup_text,
                 tooltip=location_text,
-                icon=folium.Icon(color=circle_color)
+                icon=folium.Icon(color=circle_color, icon='compass', prefix='fa')
             ).add_to(m)
     return m
