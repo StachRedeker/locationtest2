@@ -11,14 +11,14 @@ import points
 from map_plot import plot_location
 import voice_memo
 
-# Set page configuration with custom favicon.
+# Set page config with centered layout and custom favicon.
 st.set_page_config(
     page_title="Piraten Locatiekaart",
     page_icon="favicon.png",
-    layout="wide"
+    layout="centered"
 )
 
-# Custom CSS to force a max-width on the container so that on desktop the content stays within bounds.
+# Custom CSS to force a max-width on the container for desktop responsiveness.
 st.markdown(
     """
     <style>
@@ -64,7 +64,6 @@ if authenticated:
             # Maak de kaart met de (optioneel gefilterde) punten
             folium_map = plot_location(lat, lon, show_radii, points_df=df_points)
             map_html = folium_map.get_root().render()
-            # Replace fixed width with 100% so that the map is responsive.
             map_html = map_html.replace('width:700px', 'width:100%')
             components.html(map_html, height=500)
             
@@ -95,7 +94,7 @@ if authenticated:
                             try:
                                 file_data, file_name = voice_memo.get_decrypted_voice_memo(row["voice_memo"])
                                 b64 = base64.b64encode(file_data).decode()
-                                # Use MIME type application/octet-stream so the browser doesn't append .mp3
+                                # Gebruik MIME type application/octet-stream zodat er geen .mp3 wordt toegevoegd.
                                 download_link = f'<a href="data:application/octet-stream;base64,{b64}" download="{file_name}">Schat opgraven</a>'
                                 voice_memo_status.append(download_link)
                             except Exception as e:
@@ -108,6 +107,5 @@ if authenticated:
                 display_df = closest_df.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
                 final_cols = ["Locatie", "Straal (km)", "Actieve Periode", "Afstand (km)", "Schat"]
                 html_table = display_df[final_cols].to_html(escape=False, index=False)
-                # Voeg custom CSS toe voor links uitgelijnde koppen
                 html_table = '<style>th { text-align: left !important; }</style>' + html_table
                 st.markdown(f'<div style="overflow-x:auto;">{html_table}</div>', unsafe_allow_html=True)
