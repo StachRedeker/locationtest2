@@ -33,9 +33,9 @@ if authenticated:
         if loc and "coords" in loc:
             lat = loc["coords"]["latitude"]
             lon = loc["coords"]["longitude"]
-            # Use container width for better responsiveness
+            # Remove use_container_width parameter since it's not supported.
             folium_map = plot_location(lat, lon, show_radii)
-            folium_static(folium_map, height=500, use_container_width=True)
+            folium_static(folium_map, height=500)
             
             # User inputs for number of locations to show and whether to hide inactive ones
             num_locations = st.number_input("Aantal locaties om te tonen", 
@@ -85,5 +85,5 @@ if authenticated:
                 display_df = closest_df.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
                 final_cols = ["Locatie", "Straal (km)", "Actieve Periode", "Afstand (km)", "Stemmemo"]
                 html_table = display_df[final_cols].to_html(escape=False, index=False)
-                # Wrap the table in a responsive div
+                # Wrap the table in a responsive div for horizontal scrolling
                 st.markdown(f'<div style="overflow-x:auto;">{html_table}</div>', unsafe_allow_html=True)
