@@ -21,11 +21,11 @@ Bereid je voor op een avontuur vol verborgen rijkdommen en gevaarlijke wateren! 
 
 username, authenticated = auth.authenticate()
 if authenticated:
-    # Checkbox voor het tonen van cirkels
+    # Optie om cirkels te tonen
     show_radii = st.checkbox("Toon cirkels", value=True, 
                              help="Laat de cirkels zien rond iedere locatie, alsof het vijandelijk water is.")
     
-    # Voeg de optie 'Verberg inactieve locaties' toe, samen met de andere opties
+    # Voeg de optie 'Verberg inactieve locaties' toe
     hide_inactive = st.checkbox("Verberg inactieve locaties", value=False, 
                                 help="Verberg locaties die niet actief zijn (buiten de datumperiode).")
     
@@ -36,29 +36,27 @@ if authenticated:
         if loc and "coords" in loc:
             lat = loc["coords"]["latitude"]
             lon = loc["coords"]["longitude"]
-            # Load points and filter if necessary
+            # Laad de punten en filter indien nodig
             df_points = points.load_points()
             current_date = datetime.datetime.utcnow()
             if hide_inactive:
                 df_points = df_points[df_points.apply(lambda row: row["available_from"] <= current_date <= row["available_to"], axis=1)]
             
-            # Create responsive folium map using filtered points
+            # Maak de kaart met gefilterde punten
             folium_map = plot_location(lat, lon, show_radii, points_df=df_points)
             map_html = folium_map.get_root().render()
             map_html = map_html.replace('width:700px', 'width:100%')
             components.html(map_html, height=500)
             
-            # Invoeropties voor het aantal locaties
+            # Optie voor aantal locaties
             num_locations = st.number_input("Aantal locaties om te tonen", 
                                             min_value=1, value=10, step=1,
                                             help="Voer het aantal dichtstbijzijnde locaties in dat je wilt zien. 10 is de standaard.")
             
             if st.button("Toon dichtstbijzijnde locaties, maat!"):
-                # We already have df_points filtered if hide_inactive was gekozen.
                 df_points["distance"] = df_points.apply(lambda row: points.haversine(lat, lon, row["latitude"], row["longitude"]), axis=1)
                 closest_df = df_points.nsmallest(num_locations, "distance").copy()
                 
-                # Bouw de 'Schat' kolom
                 voice_memo_status = []
                 for idx, row in closest_df.iterrows():
                     if "voice_memo" not in row or pd.isna(row["voice_memo"]) or row["voice_memo"].strip() == "":
@@ -76,7 +74,6 @@ if authenticated:
                             try:
                                 file_data, file_name = voice_memo.get_decrypted_voice_memo(row["voice_memo"])
                                 b64 = base64.b64encode(file_data).decode()
-                                # Use MIME type application/octet-stream to avoid adding .mp3 extension
                                 download_link = f'<a href="data:application/octet-stream;base64,{b64}" download="{file_name}">Schat opgraven</a>'
                                 voice_memo_status.append(download_link)
                             except Exception as e:
@@ -89,4 +86,6 @@ if authenticated:
                 display_df = closest_df.rename(columns={"pointer_text": "Locatie", "radius": "Straal (km)"})
                 final_cols = ["Locatie", "Straal (km)", "Actieve Periode", "Afstand (km)", "Schat"]
                 html_table = display_df[final_cols].to_html(escape=False, index=False)
+                # Voeg custom CSS toe voor links uitgelijnde headers
+                html_table = '<style>th { text-align: left !important; }</style>' + html_table
                 st.markdown(f'<div style="overflow-x:auto;">{html_table}</div>', unsafe_allow_html=True)
